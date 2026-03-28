@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createWalletClient, custom, http, type EIP1193Provider, type WalletClient } from "viem";
 import { useViemClient } from "@getpara/react-sdk/evm";
 import { useAccount, useClient, useWallet } from "@getpara/react-sdk";
-import { getAppChain, getRpcUrl } from "@/lib/viem/appChain";
+import { getAppChain, getMonadRpcTransport, getRpcUrl } from "@/lib/viem/appChain";
 import { eip1193WithEthChainIdFallback } from "@/lib/viem/eip1193ChainIdFallback";
 import {
   bestInjectedProviderSync,
@@ -57,7 +57,7 @@ export function useParaViem(): ParaViem {
     address,
     walletClientConfig: {
       chain,
-      transport: http(getRpcUrl()),
+      transport: getMonadRpcTransport(getRpcUrl()),
     },
   });
 

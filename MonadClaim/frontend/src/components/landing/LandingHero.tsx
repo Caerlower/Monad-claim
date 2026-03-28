@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
+import { TOKEN_LOGO_MON } from "@/lib/tokenLogos";
 
 const HeroMockup = () => (
   <div className="relative mt-16 mx-auto max-w-2xl">
@@ -40,11 +41,7 @@ const HeroMockup = () => (
               <div className="tracking-label mb-2">Token</div>
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 rounded-full bg-muted/40 border border-border/60 flex items-center justify-center overflow-hidden">
-                  <img
-                    src="https://avatars.githubusercontent.com/u/174397852?s=200&v=4"
-                    alt="MON"
-                    className="w-4 h-4 object-contain"
-                  />
+                  <img src={TOKEN_LOGO_MON} alt="" className="w-4 h-4 object-cover rounded-full" loading="lazy" />
                 </div>
                 <span className="text-sm font-medium">MON</span>
               </div>
@@ -88,7 +85,7 @@ const LandingHero = () => {
 
         <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
           Lock funds in <span className="text-foreground/90 font-medium">UniversalClaimLinks</span> escrow on Monad and share a
-          link. Recipients claim on-chain and can swap to other tokens with Kuru Flow.
+          link. Recipients claim on-chain and can swap to other tokens with Uniswap v3.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

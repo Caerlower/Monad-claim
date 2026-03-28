@@ -139,6 +139,57 @@
   },
   {
     "type": "function",
+    "name": "executeClaim",
+    "inputs": [
+      {
+        "name": "claimId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "tokenOut",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "secret",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "executeClaim",
+    "inputs": [
+      {
+        "name": "claimId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "tokenOut",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "executeClaimAndSwap",
     "inputs": [
       {
@@ -589,6 +640,11 @@
   {
     "type": "error",
     "name": "SwapFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TokenOutMismatch",
     "inputs": []
   },
   {

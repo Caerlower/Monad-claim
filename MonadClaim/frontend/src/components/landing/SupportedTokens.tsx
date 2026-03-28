@@ -1,18 +1,19 @@
 import { motion } from "framer-motion";
 import { Layers } from "lucide-react";
+import { TOKEN_LOGO_MON, TOKEN_LOGO_USDC } from "@/lib/tokenLogos";
 
 const tokens = [
   {
     symbol: "MON",
     name: "Monad (native)",
     blurb: "Gas token & native transfers",
-    logoUrl: "https://avatars.githubusercontent.com/u/174397852?s=200&v=4",
+    logoUrl: TOKEN_LOGO_MON,
   },
   {
     symbol: "USDC",
     name: "USD Coin",
     blurb: "Bridged stablecoin on Monad",
-    logoUrl: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png",
+    logoUrl: TOKEN_LOGO_USDC,
   },
 ];
 
@@ -30,7 +31,7 @@ const SupportedTokens = () => {
           <p className="text-sm text-muted-foreground max-w-lg mx-auto mb-12 leading-relaxed">
             Deposit <span className="text-foreground/90 font-medium">MON</span> or{" "}
             <span className="text-foreground/90 font-medium">USDC</span> into escrow. At claim time, receivers can swap into
-            other Monad ERC-20s via <span className="text-foreground/90 font-medium">Kuru Flow</span> routing — not only the
+            other Monad ERC-20s via <span className="text-foreground/90 font-medium">Uniswap v3</span> routing — not only the
             tokens listed here.
           </p>
         </motion.div>
@@ -47,7 +48,13 @@ const SupportedTokens = () => {
               className="glass rounded-2xl px-8 py-5 flex items-center gap-4 hover:border-primary/20 transition-all duration-300 cursor-default"
             >
               <div className="w-10 h-10 rounded-full bg-muted/40 border border-border/60 flex items-center justify-center overflow-hidden">
-                <img src={token.logoUrl} alt={token.symbol} className="h-8 w-8 object-contain" />
+                <img
+                  src={token.logoUrl}
+                  alt=""
+                  className="h-8 w-8 object-cover rounded-full"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
               <div className="text-left">
                 <div className="font-semibold text-sm text-foreground">{token.symbol}</div>
@@ -71,7 +78,7 @@ const SupportedTokens = () => {
             <div className="text-left">
               <div className="font-semibold text-sm text-foreground">More assets</div>
               <div className="text-xs text-muted-foreground">Other ERC-20s on Monad</div>
-              <div className="text-[11px] text-muted-foreground/90 mt-0.5">Swap at claim via Kuru</div>
+              <div className="text-[11px] text-muted-foreground/90 mt-0.5">Swap at claim via Uniswap</div>
             </div>
           </motion.div>
         </div>

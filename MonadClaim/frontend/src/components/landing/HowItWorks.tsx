@@ -15,7 +15,7 @@ const steps = [
   {
     icon: Wallet,
     title: "Receiver Claims",
-    description: "They connect on Monad, pick an output token (Kuru Flow quotes), and execute the claim on-chain.",
+    description: "They connect on Monad, pick an output token (Uniswap v3 quote), and execute the claim on-chain.",
   },
 ];
 

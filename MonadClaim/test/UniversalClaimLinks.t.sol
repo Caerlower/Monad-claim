@@ -14,7 +14,7 @@ contract MockERC20 is ERC20 {
     }
 }
 
-contract MockKuruRouter {
+contract MockSwapRouter {
     function swap(
         address tokenIn,
         address tokenOut,
@@ -43,7 +43,7 @@ contract MockKuruRouter {
 
 contract UniversalClaimLinksTest is Test {
     UniversalClaimLinks internal claimLinks;
-    MockKuruRouter internal router;
+    MockSwapRouter internal router;
     MockERC20 internal tokenA;
     MockERC20 internal tokenB;
 
@@ -61,7 +61,7 @@ contract UniversalClaimLinksTest is Test {
 
     function setUp() public {
         claimLinks = new UniversalClaimLinks();
-        router = new MockKuruRouter();
+        router = new MockSwapRouter();
         tokenA = new MockERC20("Token A", "TA");
         tokenB = new MockERC20("Token B", "TB");
 
@@ -80,7 +80,7 @@ contract UniversalClaimLinksTest is Test {
 
         uint256 amountOut = 240 ether;
         bytes memory swapData = abi.encodeWithSelector(
-            MockKuruRouter.swap.selector, address(tokenA), address(tokenB), amountIn, amountOut, receiver, false
+            MockSwapRouter.swap.selector, address(tokenA), address(tokenB), amountIn, amountOut, receiver, false
         );
 
         vm.prank(receiver);
@@ -101,7 +101,7 @@ contract UniversalClaimLinksTest is Test {
 
         uint256 amountOut = 500 ether;
         bytes memory swapData = abi.encodeWithSelector(
-            MockKuruRouter.swap.selector, address(0), address(tokenB), 1 ether, amountOut, receiver, true
+            MockSwapRouter.swap.selector, address(0), address(tokenB), 1 ether, amountOut, receiver, true
         );
 
         vm.prank(receiver);
@@ -120,7 +120,7 @@ contract UniversalClaimLinksTest is Test {
         vm.stopPrank();
 
         bytes memory swapData = abi.encodeWithSelector(
-            MockKuruRouter.swap.selector, address(tokenA), address(tokenB), amountIn, 10 ether, receiver, false
+            MockSwapRouter.swap.selector, address(tokenA), address(tokenB), amountIn, 10 ether, receiver, false
         );
 
         vm.prank(random);
@@ -144,5 +144,48 @@ contract UniversalClaimLinksTest is Test {
         assertEq(balAfter - balBefore, amountIn);
         UniversalClaimLinks.Claim memory c = claimLinks.getClaim(claimId);
         assertEq(c.status, 2);
+    }
+
+    function testExecuteClaim_ERC20SameToken() public {
+        uint256 amountIn = 77 ether;
+        vm.startPrank(sender);
+        tokenA.approve(address(claimLinks), amountIn);
+        uint256 claimId = claimLinks.createClaim(receiver, tokenA, _amount128(amountIn), uint40(block.timestamp + 1 days));
+        vm.stopPrank();
+
+        uint256 before = tokenA.balanceOf(receiver);
+        vm.prank(receiver);
+        claimLinks.executeClaim(claimId, address(tokenA), receiver);
+
+        assertEq(tokenA.balanceOf(receiver) - before, amountIn);
+        assertEq(claimLinks.getClaim(claimId).status, 1);
+    }
+
+    function testExecuteClaim_NativeOpenWithSecret() public {
+        bytes memory secret = bytes("s");
+        bytes32 secretHash = keccak256(secret);
+
+        vm.prank(sender);
+        uint256 claimId =
+            claimLinks.createClaimNativeOpen{value: 2 ether}(uint40(block.timestamp + 1 days), secretHash);
+
+        uint256 bal0 = receiver.balance;
+        vm.prank(receiver);
+        claimLinks.executeClaim(claimId, address(0), secret, receiver);
+
+        assertEq(receiver.balance - bal0, 2 ether);
+        assertEq(claimLinks.getClaim(claimId).status, 1);
+    }
+
+    function testExecuteClaim_RevertsIfTokenOutMismatch() public {
+        uint256 amountIn = 10 ether;
+        vm.startPrank(sender);
+        tokenA.approve(address(claimLinks), amountIn);
+        uint256 claimId = claimLinks.createClaim(receiver, tokenA, _amount128(amountIn), uint40(block.timestamp + 1 days));
+        vm.stopPrank();
+
+        vm.prank(receiver);
+        vm.expectRevert(UniversalClaimLinks.TokenOutMismatch.selector);
+        claimLinks.executeClaim(claimId, address(tokenB), receiver);
     }
 }

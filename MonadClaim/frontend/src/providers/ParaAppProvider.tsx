@@ -3,6 +3,7 @@ import { Environment, ParaProvider } from "@getpara/react-sdk";
 import "@getpara/react-sdk/styles.css";
 import { useMemo } from "react";
 import { useTheme } from "@/providers/ThemeProvider";
+import { TOKEN_LOGO_USDC, absoluteTokenLogoUrl } from "@/lib/tokenLogos";
 import { getAppChain, getParaBalanceNetwork } from "@/lib/viem/appChain";
 import { MONAD_TESTNET_TOKENS } from "@/lib/contracts/contractConfig";
 
@@ -20,7 +21,10 @@ export function ParaAppProvider({ children }: ParaAppProviderProps) {
 
   const appName = "MonadClaim";
   const chain = useMemo(() => getAppChain(), []);
-  const paraNetwork = useMemo(() => getParaBalanceNetwork(), []);
+  const paraNetwork = useMemo(() => {
+    const n = getParaBalanceNetwork();
+    return { ...n, logoUrl: absoluteTokenLogoUrl(n.logoUrl) };
+  }, []);
 
   const usdcAddress = useMemo(() => {
     const chainId = Number(import.meta.env.VITE_CHAIN_ID || 10143);
@@ -103,7 +107,7 @@ export function ParaAppProvider({ children }: ParaAppProviderProps) {
                     {
                       name: "USD Coin",
                       symbol: "USDC",
-                      logoUrl: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png",
+                      logoUrl: absoluteTokenLogoUrl(TOKEN_LOGO_USDC),
                       implementations: [
                         {
                           network: paraNetwork,

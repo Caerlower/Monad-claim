@@ -66,6 +66,7 @@ contract UniversalClaimLinks is ReentrancyGuard, Pausable {
     error SwapFailed();
     error TransferFailed();
     error NotOwner();
+    error TokenOutMismatch();
 
     modifier onlyOwner() {
         _onlyOwner();
@@ -83,7 +84,7 @@ contract UniversalClaimLinks is ReentrancyGuard, Pausable {
 
     receive() external payable {}
 
-    /// @dev Kuru Flow returns `transaction.{to,calldata,value}` for the account that executes the swap — use this contract’s address when requesting quotes.
+    /// @dev Aggregators (e.g. Uniswap) return `transaction.{to,calldata,value}` for the swap executor — use this contract’s address when requesting quotes.
     function _toUint128(uint256 x) internal pure returns (uint128 r) {
         if (x > type(uint128).max) revert InvalidAmount();
         unchecked {
@@ -152,7 +153,56 @@ contract UniversalClaimLinks is ReentrancyGuard, Pausable {
         claimId = _createClaim(msg.sender, address(0), TOKEN_NATIVE, _toUint128(msg.value), expiry, secretHash, true);
     }
 
-    /// @notice Locked claim: `swapTo` / `swapCalldata` / `swapValue` come from Kuru Flow `quote.transaction` (executor = this contract).
+    /// @notice Payout escrow to `recipient` in the **same** asset as `tokenIn` (`tokenOut` must equal `tokenIn`). No DEX call.
+    function executeClaim(uint256 claimId, address tokenOut, address recipient) external nonReentrant {
+        _executeClaimPayout(claimId, tokenOut, bytes(""), recipient);
+    }
+
+    /// @notice Open claim: `secret` must satisfy `keccak256(secret) == claim.secretHash`.
+    function executeClaim(uint256 claimId, address tokenOut, bytes calldata secret, address recipient) external nonReentrant {
+        _executeClaimPayout(claimId, tokenOut, secret, recipient);
+    }
+
+    function _executeClaimPayout(uint256 claimId, address tokenOut, bytes memory secret, address recipient)
+        internal
+        whenNotPaused
+    {
+        if (recipient == address(0)) revert InvalidReceiver();
+
+        Claim storage c = _claims[claimId];
+        if (c.sender == address(0)) revert ClaimNotFound();
+        if (c.status != STATUS_OPEN) revert NotOpen();
+        if (block.timestamp >= c.expiry) revert ClaimExpired();
+
+        if (c.secretHash == bytes32(0)) {
+            if (msg.sender != c.receiver) revert NotReceiver();
+        } else {
+            if (keccak256(secret) != c.secretHash) revert InvalidSecret();
+            c.receiver = msg.sender;
+        }
+
+        address tokenIn = c.tokenIn;
+        if (tokenIn != tokenOut) revert TokenOutMismatch();
+
+        address receiver = c.receiver;
+        uint256 amountIn = uint256(c.amountIn);
+        c.status = STATUS_EXECUTED;
+
+        uint256 amountOut = _payoutSameToken(tokenIn, amountIn, recipient);
+        emit ClaimExecuted(claimId, receiver, tokenIn, tokenOut, amountIn, amountOut, address(0));
+    }
+
+    function _payoutSameToken(address token, uint256 amount, address recipient) internal returns (uint256) {
+        if (token == TOKEN_NATIVE) {
+            (bool sent,) = payable(recipient).call{value: amount}("");
+            if (!sent) revert TransferFailed();
+        } else {
+            IERC20(token).safeTransfer(recipient, amount);
+        }
+        return amount;
+    }
+
+    /// @notice Locked claim: `swapTo` / `swapCalldata` / `swapValue` from the aggregator quote (executor = this contract).
     function executeClaimAndSwap(
         uint256 claimId,
         address tokenOut,

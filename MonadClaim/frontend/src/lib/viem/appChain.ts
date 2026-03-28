@@ -1,4 +1,5 @@
-import { createPublicClient, http, type Chain, type PublicClient } from "viem";
+import { createPublicClient, http, type Chain, type PublicClient, type Transport } from "viem";
+import { TOKEN_LOGO_MON } from "@/lib/tokenLogos";
 import { hardhat } from "viem/chains";
 import { defineChain } from "viem";
 
@@ -47,6 +48,18 @@ export function getRpcUrl(): string {
 }
 
 /** Block explorer origin (no trailing slash) for links — matches `VITE_CHAIN_ID` unless overridden. */
+/**
+ * Monad public RPCs sometimes return HTTP 413 if a JSON-RPC batch or concurrent load exceeds their limit.
+ * Keep transport batching off and allow longer timeouts than viem’s default.
+ */
+export function getMonadRpcTransport(rpcUrl: string): Transport {
+  return http(rpcUrl, {
+    batch: false,
+    retryCount: 2,
+    timeout: 60_000,
+  });
+}
+
 export function getExplorerBaseUrl(): string {
   const fromEnv = import.meta.env.VITE_MONAD_EXPLORER_URL?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
@@ -75,7 +88,7 @@ export function getParaBalanceNetwork(): {
       name: "Monad Mainnet",
       evmChainId: "143",
       nativeTokenSymbol: "MON",
-      logoUrl: "https://monad.xyz/favicon.ico",
+      logoUrl: TOKEN_LOGO_MON,
       rpcUrl,
       explorer: {
         name: "MonadExplorer",
@@ -89,7 +102,7 @@ export function getParaBalanceNetwork(): {
     name: "Monad Testnet",
     evmChainId: "10143",
     nativeTokenSymbol: "MON",
-    logoUrl: "https://monad.xyz/favicon.ico",
+    logoUrl: TOKEN_LOGO_MON,
     rpcUrl,
     explorer: {
       name: "MonadExplorer",
@@ -108,7 +121,11 @@ export function getPublicClient(): PublicClient {
   const url = getRpcUrl();
   const key = `${chain.id}:${url}`;
   if (!cached || cachedKey !== key) {
-    cached = createPublicClient({ chain, transport: http(url) });
+    cached = createPublicClient({
+      chain,
+      transport: getMonadRpcTransport(url),
+      batch: { multicall: false },
+    });
     cachedKey = key;
   }
   return cached;

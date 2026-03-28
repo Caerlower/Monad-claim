@@ -1,4 +1,4 @@
-/** Unified shape for claim list UI (on-chain indexed; optional future Supabase). */
+/** Unified shape for claim list UI (built from on-chain logs + `getClaim` reads). */
 export type ClaimRecord = {
   claim_id: string;
   chain_id: number;

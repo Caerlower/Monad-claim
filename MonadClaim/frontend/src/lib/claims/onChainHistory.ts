@@ -170,3 +170,35 @@ export async function fetchClaimsForAddressFromChain(
   out.sort((a, b) => (BigInt(b.claim_id) > BigInt(a.claim_id) ? 1 : BigInt(b.claim_id) < BigInt(a.claim_id) ? -1 : 0));
   return out;
 }
+
+/** Tx that executed or cancelled a claim (for explorer links). Requires `VITE_CLAIMS_FROM_BLOCK` ≤ deployment block when set. */
+export async function fetchSettlementTxHashForClaim(
+  publicClient: PublicClient,
+  params: { claimLinks: Address; claimId: bigint; status: number },
+): Promise<`0x${string}` | null> {
+  if (params.status === 0) return null;
+  const fromBlock = fromBlockEnv();
+  if (params.status === 1) {
+    const logs = await getLogs(publicClient, {
+      address: params.claimLinks,
+      event: claimExecutedEvent,
+      args: { claimId: params.claimId },
+      fromBlock,
+      toBlock: "latest",
+    });
+    const log = logs[logs.length - 1];
+    return log?.transactionHash ?? null;
+  }
+  if (params.status === 2) {
+    const logs = await getLogs(publicClient, {
+      address: params.claimLinks,
+      event: claimCancelledEvent,
+      args: { claimId: params.claimId },
+      fromBlock,
+      toBlock: "latest",
+    });
+    const log = logs[logs.length - 1];
+    return log?.transactionHash ?? null;
+  }
+  return null;
+}

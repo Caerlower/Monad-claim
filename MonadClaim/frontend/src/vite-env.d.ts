@@ -17,6 +17,22 @@ interface ImportMetaEnv {
   readonly VITE_TOKEN_USDC?: string;
   /** First block to scan for `ClaimCreated` logs (default 0). Set to your deployment block if log queries time out. */
   readonly VITE_CLAIMS_FROM_BLOCK?: string;
+  /** Override Uniswap v3 addresses if Monad testnet/mainnet deployments change. */
+  readonly VITE_UNISWAP_V3_SWAP_ROUTER_10143?: string;
+  readonly VITE_UNISWAP_V3_QUOTER_V2_10143?: string;
+  readonly VITE_UNISWAP_V3_FACTORY_10143?: string;
+  readonly VITE_UNISWAP_WMON_10143?: string;
+  readonly VITE_UNISWAP_V3_SWAP_ROUTER_143?: string;
+  readonly VITE_UNISWAP_V3_QUOTER_V2_143?: string;
+  readonly VITE_UNISWAP_V3_FACTORY_143?: string;
+  readonly VITE_UNISWAP_WMON_143?: string;
+  /** Optional extra “Receive as” tokens (address + symbol + decimals). */
+  readonly VITE_CLAIM_TOKEN3_ADDRESS?: string;
+  readonly VITE_CLAIM_TOKEN3_SYMBOL?: string;
+  readonly VITE_CLAIM_TOKEN3_DECIMALS?: string;
+  readonly VITE_CLAIM_TOKEN4_ADDRESS?: string;
+  readonly VITE_CLAIM_TOKEN4_SYMBOL?: string;
+  readonly VITE_CLAIM_TOKEN4_DECIMALS?: string;
 }
 
 interface ImportMeta {

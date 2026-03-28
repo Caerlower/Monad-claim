@@ -1,3 +1,14 @@
+/** HTTP / RPC quirks (e.g. Monad public RPC 413 under load or huge batches). */
+export function formatRpcTransportError(message: string): string {
+  if (/413|Payload Too Large|Request Entity Too Large|body exceeds/i.test(message)) {
+    return [
+      "Monad RPC returned HTTP 413 (request too large). The public testnet endpoint can reject big or batched JSON-RPC payloads when busy.",
+      "Try: refresh and claim again; set VITE_CLAIMS_FROM_BLOCK to your claim contract deployment block (smaller log queries); use a dedicated/testnet RPC if you have one.",
+    ].join(" ");
+  }
+  return message;
+}
+
 /** Turn low-level RPC errors into something actionable for wallet / Para setups. */
 export function formatWriteContractError(message: string): string {
   if (/eth_sendTransaction is not supported/i.test(message)) {
@@ -10,7 +21,7 @@ export function formatWriteContractError(message: string): string {
     return [
       "The claim contract may not hold enough of the output token to pay you at the quoted rate.",
       "Escrowed MON / USDC stays in the contract for accounting; some flows require separate liquidity for payouts.",
-      "Fix: try another output token, or ensure the contract can fulfill the swap route on Kuru.",
+      "Fix: try another output token, or ensure the swap route has liquidity on Uniswap v3.",
     ].join(" ");
   }
   if (/ClaimExpired|execution reverted.*ClaimExpired/i.test(message)) {
@@ -27,6 +38,18 @@ export function formatWriteContractError(message: string): string {
   }
   if (/NotOpen|execution reverted.*NotOpen/i.test(message)) {
     return "This claim is no longer open (already claimed or cancelled).";
+  }
+  if (/TokenOutMismatch|execution reverted.*TokenOutMismatch/i.test(message)) {
+    return "Direct claim requires the same asset as the escrow (e.g. native MON in → native MON out). Pick MON if the claim was funded with MON.";
+  }
+  if (/TransferFailed|execution reverted.*TransferFailed/i.test(message)) {
+    return "Native transfer to your wallet failed on-chain (some contracts cannot receive MON). Try an EOA or a wallet that accepts native transfers.";
+  }
+  if (/InvalidSecret|execution reverted.*InvalidSecret/i.test(message)) {
+    return "Wrong or missing secret for this claim. Open the link with the correct #fragment in the URL.";
+  }
+  if (/ClaimNotFound|execution reverted.*ClaimNotFound/i.test(message)) {
+    return "No claim exists for this id at this contract address.";
   }
   return message;
 }

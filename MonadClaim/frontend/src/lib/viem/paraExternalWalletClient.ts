@@ -2,7 +2,6 @@ import {
   createWalletClient,
   hashMessage,
   hashTypedData,
-  http,
   parseSignature,
   serializeSignature,
   serializeTransaction,
@@ -15,6 +14,8 @@ import {
 } from "viem";
 import { hashAuthorization } from "viem/utils";
 import { toAccount } from "viem/accounts";
+
+import { getMonadRpcTransport } from "@/lib/viem/appChain";
 
 /** Match Para SDK / `rlpEncodedTxBase64` (hex body without `0x`). */
 export function hexStringToBase64(hex: string): string {
@@ -146,6 +147,6 @@ export function createParaExternalEvmWalletClient(
   return createWalletClient({
     account,
     chain,
-    transport: http(rpcHttpUrl),
+    transport: getMonadRpcTransport(rpcHttpUrl),
   });
 }

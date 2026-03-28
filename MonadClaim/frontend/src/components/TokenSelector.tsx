@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { TOKEN_LOGO_MON, TOKEN_LOGO_USDC } from "@/lib/tokenLogos";
 
 interface Token {
   symbol: string;
@@ -11,12 +12,12 @@ const TOKENS: Token[] = [
   {
     symbol: "MON",
     name: "Monad (native)",
-    logoUrl: "https://avatars.githubusercontent.com/u/174397852?s=200&v=4",
+    logoUrl: TOKEN_LOGO_MON,
   },
   {
     symbol: "USDC",
     name: "USD Coin",
-    logoUrl: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png",
+    logoUrl: TOKEN_LOGO_USDC,
   },
 ];
 
@@ -43,7 +44,13 @@ const TokenSelector = ({ value, onChange, label, symbols }: TokenSelectorProps) 
       >
         <div className="flex items-center gap-3">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/40 border border-border/60 overflow-hidden">
-            <img src={selected.logoUrl} alt={selected.symbol} className="h-6 w-6 object-contain" />
+            <img
+              src={selected.logoUrl}
+              alt=""
+              className="h-6 w-6 object-cover rounded-full"
+              loading="lazy"
+              decoding="async"
+            />
           </span>
           <div className="text-left">
             <div className="text-sm font-semibold">{selected.symbol}</div>
@@ -67,7 +74,13 @@ const TokenSelector = ({ value, onChange, label, symbols }: TokenSelectorProps) 
               }`}
             >
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-muted/40 border border-border/60 overflow-hidden">
-                <img src={token.logoUrl} alt={token.symbol} className="h-5 w-5 object-contain" />
+                <img
+                  src={token.logoUrl}
+                  alt=""
+                  className="h-5 w-5 object-cover rounded-full"
+                  loading="lazy"
+                  decoding="async"
+                />
               </span>
               <div className="text-left">
                 <div className="text-sm font-medium">{token.symbol}</div>

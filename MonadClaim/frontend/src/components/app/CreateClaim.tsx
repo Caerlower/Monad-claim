@@ -11,6 +11,7 @@ import { parseClaimIdFromReceipt } from "@/lib/contracts/parseClaimCreated";
 import { useParaViem } from "@/hooks/useParaViem";
 import { getAppChain, getExplorerBaseUrl, getPublicClient } from "@/lib/viem/appChain";
 import { formatWriteContractError } from "@/lib/viem/txErrors";
+import { TOKEN_LOGO_MON, TOKEN_LOGO_USDC } from "@/lib/tokenLogos";
 
 type FlowState = "form" | "loading" | "success";
 
@@ -18,13 +19,12 @@ const tokens: { symbol: SupportedSymbol; name: string; logoUrl: string }[] = [
   {
     symbol: "MON",
     name: "Monad",
-    logoUrl:
-      "https://avatars.githubusercontent.com/u/174397852?s=200&v=4",
+    logoUrl: TOKEN_LOGO_MON,
   },
   {
     symbol: "USDC",
     name: "USD Coin",
-    logoUrl: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png",
+    logoUrl: TOKEN_LOGO_USDC,
   },
 ];
 
@@ -290,7 +290,13 @@ const CreateClaim = () => {
                 }`}
               >
                 <div className="w-9 h-9 rounded-full bg-muted/40 border border-border/60 flex items-center justify-center overflow-hidden">
-                  <img src={token.logoUrl} alt={token.symbol} className="h-7 w-7 object-contain" />
+                  <img
+                    src={token.logoUrl}
+                    alt=""
+                    className="h-7 w-7 object-cover rounded-full"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <span className="text-xs font-medium text-foreground">{token.symbol}</span>
               </motion.button>

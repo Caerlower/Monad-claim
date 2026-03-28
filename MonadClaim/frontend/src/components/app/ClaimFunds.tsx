@@ -212,7 +212,7 @@ const ClaimFunds = ({ initialClaimId = null }: ClaimFundsProps) => {
                       : chainNowTs != null && chainNowTs >= BigInt(c.expiry_ts)
                         ? "bg-destructive/15 text-destructive/90"
                         : c.status === "open"
-                          ? "bg-amber-500/15 text-amber-300"
+                          ? "bg-primary/15 text-primary"
                           : "bg-muted text-muted-foreground"
                   }`}
                 >

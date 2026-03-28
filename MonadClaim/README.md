@@ -1,215 +1,344 @@
-## MonadClaim (Foundry + frontend)
+# MonadClaim (Universal Claim Links on Monad)
 
-This repo is the single home for **Universal Claim Links on Monad**: escrow + **atomic claim-and-swap** via Kuru Flow (`executeClaimAndSwap`).
+**MonadClaim** is **shareable claim links** on **[Monad](https://monad.xyz)**: funds stay in a **contract** until the right person **claims** before **expiry**—typically as the **same token** (**MON** or **USDC**), or as **another token** via **Uniswap v3** where swaps are live. Wallets and signing use **[Para](https://docs.getpara.com/)**.
 
-- **Contracts (Foundry)**: `src/UniversalClaimLinks.sol`, tests in `test/UniversalClaimLinks.t.sol`
-- **App (Vite + React + Para)**: `frontend/` — install with **pnpm** only
+---
 
-> [!NOTE]
-> Default chain in `foundry.toml` is Monad testnet (`10143`). The Vite app reads `VITE_CHAIN_ID` (see `frontend/.env.example`).
+## At a glance
 
-<h4 align="center">
-  <a href="https://docs.monad.xyz">Monad Documentation</a> | <a href="https://book.getfoundry.sh/">Foundry Documentation</a> |
-   <a href="https://github.com/monad-developers/foundry-monad/issues">Report Issue</a>
-</h4>
+- Lock **MON** or **USDC** (or extra tokens via env); **receiver address** or **open** claim with **secret** in the URL `#` fragment.
+- **One claim** while open & not expired: **1:1 payout** or **swap + claim** if quotes work on your network.
+- **No backend DB** for history—the app reads **chain events** + **`getClaim`** (see *Where history lives*).
+- New **deploy = new contract**; old links still point at the contract they were created on.
 
+---
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+## Features
 
-Foundry consists of:
+- On-chain escrow with **expiry** and **sender cancellation after expiry** (`cancelClaim`).
+- **Address-locked** claims (only the designated receiver executes) and **open / secret** claims (anyone with the secret; executor becomes the recorded receiver).
+- **Direct claim** (`executeClaim`): payout **must** match escrowed asset (`tokenOut == tokenIn`, including native `address(0)` for MON).
+- **Claim + swap** (`executeClaimAndSwap`): uses an aggregator quote (Uniswap v3 router calldata) executed by the contract, then delivers `tokenOut` to the recipient.
+- Web app: **Create**, **Claim**, and receipts-style listing fed **only from Monad** (plus optional explorer links after settlement).
+- **Para** for embedded and external wallets (MetaMask, Phantom; optional WalletConnect when configured).
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat, and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions, and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose Solidity REPL.
+---
 
-## Documentation
+## Verified / deployed contract
 
-https://book.getfoundry.sh/
+There is **no single canonical address** in this repo—you deploy `UniversalClaimLinks` yourself (or use an address your team agrees on). After deployment:
 
-## Usage
+1. Put the address in **`VITE_UNIVERSAL_CLAIM_LINKS_ADDRESS`** (see `.env.example`).
+2. Verify it on the explorer for your chain (testnet vs mainnet) using your toolchain’s verify flow.
 
-### Frontend
+Use Monad’s explorers, e.g. [Monad testnet explorer](https://testnet.monadexplorer.com/) / [mainnet](https://monadexplorer.com/), depending on `VITE_CHAIN_ID`.
 
-```shell
+---
+
+## On-chain rules (what the contract enforces)
+
+- **Escrow**: `tokenIn` and amounts are fixed at creation; funds stay in the contract until **executed** or **cancelled after expiry**.
+- **Expiry**: `executeClaim` / `executeClaimAndSwap` require `block.timestamp < expiry`. After expiry, **only the sender** may `cancelClaim` and recover escrow.
+- **Who may execute**
+  - **Locked** (`secretHash == 0`): `msg.sender` must be `receiver`.
+  - **Open** (`secretHash != 0`): caller must supply `secret` with `keccak256(secret) == secretHash`; receiver is set to `msg.sender` on success.
+- **Direct vs swap**
+  - `executeClaim` **reverts** if `tokenOut != tokenIn` (`TokenOutMismatch`).
+  - `executeClaimAndSwap` performs the external call to `swapTo` with the quoted calldata and sends the resulting `tokenOut` (or native) to `recipient`.
+- **Operations**: `owner` can **pause** / **unpause**; ownership can be transferred.
+
+---
+
+## Design choices (why it works this way)
+
+- **Link = id (+ fragment)**: The shareable URL carries a **claim id**; open claims also put the **secret after `#`** so typical HTTP logs and referrers do not see it as a path segment.
+- **No backend for truth**: Custody and balances live in the contract; the UI **reconstructs** activity from **events + reads**, so there is no Supabase or server to trust for “who owns which claim.”
+- **Refunds are manual**: Nothing auto-returns funds at expiry; the sender must call **`cancelClaim`** after the deadline.
+- **Swaps depend on chain conditions**: Quoting uses **Uniswap v3** addresses for Monad; on some environments (especially **testnet**) published router addresses may have **no code** until redeploys—same-asset **MON** claims still work without DEX.
+
+---
+
+## Project structure
+
+```text
+MonadClaim/
+├── src/UniversalClaimLinks.sol     # Escrow + executeClaim / executeClaimAndSwap
+├── test/UniversalClaimLinks.t.sol  # Forge tests
+├── script/
+│   └── DeployUniversalClaimLinks.s.sol
+├── scripts/
+│   ├── deploy-env.sh               # Deploy using PRIVATE_KEY in .env
+│   ├── doctor.sh                   # Quick health checks
+│   └── sync-universal-claim-abi.mjs
+├── lib/                            # Foundry deps (OpenZeppelin, forge-std, …)
+├── foundry.toml
+├── package.json                    # Root: compile, test, deploy scripts
+├── .env.example
+└── frontend/
+    ├── src/
+    │   ├── components/app/         # Create / Claim / Receipts (app shell)
+    │   ├── components/landing/     # Marketing sections
+    │   ├── hooks/                  # Para + viem
+    │   ├── lib/
+    │   │   ├── claims/             # On-chain history (getLogs + getClaim)
+    │   │   ├── contracts/        # ABI, env, token helpers
+    │   │   ├── viem/             # Chain + RPC helpers
+    │   │   └── uniswapV3MonadSwap.ts
+    │   ├── pages/
+    │   ├── providers/
+    │   └── public/tokens/          # Local MON / USDC artwork (optional)
+    ├── vite.config.ts
+    ├── package.json
+    └── .env.example
+```
+
+---
+
+## Architecture (high level)
+
+```mermaid
+sequenceDiagram
+  participant Sender as Sender
+  participant App as MonadClaim Web App
+  participant Wallet as Para / Wallet
+  participant Contract as UniversalClaimLinks
+  participant Receiver as Receiver
+  participant DEX as Uniswap v3 (optional)
+
+  Sender->>App: Create claim (token, amount, expiry, receiver or secret)
+  App->>Wallet: Sign transaction
+  Wallet-->>App: Signed tx
+  App->>Contract: createClaim* (ERC-20 or native)
+  Contract-->>Contract: Hold escrow, emit ClaimCreated
+  App-->>Sender: Share link (/claim/:id, secret in #fragment if open)
+
+  Receiver->>App: Open claim, connect wallet
+  App->>Contract: read getClaim + event history via RPC
+  alt Same asset
+    App->>Contract: executeClaim
+  else Swap path
+    App->>DEX: Quote off-chain (RPC)
+    App->>Contract: executeClaimAndSwap
+    Contract->>DEX: Router call
+    DEX-->>Contract: tokenOut to contract
+  end
+  Contract-->>Receiver: Payout to recipient
+
+  Note over Sender,Contract: After expiry, only sender may cancelClaim to recover escrow.
+```
+
+---
+
+## Tech stack
+
+| Layer | Choice |
+|--------|--------|
+| Smart contracts | Solidity **0.8.24**, OpenZeppelin, **Foundry** (Forge) for build & test |
+| Web app | **React**, **Vite**, **TypeScript**, **Tailwind** |
+| Wallets | **Para** (`@getpara/react-sdk`) |
+| Chain I/O | **viem** |
+| Swaps | **Uniswap v3** (QuoterV2 + SwapRouter02) on Monad where deployed |
+
+---
+
+## Prerequisites
+
+- **Node.js** ≥ 18  
+- **pnpm** for `frontend/` (required there)  
+- **Foundry** (`forge`, `cast`, `anvil`) for contracts  
+- **Para** API key for the web app (`VITE_PARA_API_KEY`)  
+- **MON** (and tokens you test with) on your target Monad network  
+- Optional: **WalletConnect** project id if you enable it in the app  
+
+---
+
+## Quick start (from scratch)
+
+### 1) Install toolchains
+
+**Repo root** (optional `pnpm install` for npm scripts that wrap Forge):
+
+```bash
+pnpm install
+```
+
+**Frontend:**
+
+```bash
 cd frontend
 pnpm install
-cp ../.env.example .env
-# or: cp .env.example .env — set VITE_PARA_API_KEY (must use the VITE_ prefix) and your contract address
-pnpm dev
 ```
 
-Para keys must be named `VITE_PARA_API_KEY` so Vite exposes them; restart the dev server after editing `.env`.
+### 2) Environment files
 
-Production build (Vite needs extra heap for this bundle):
+Copy examples:
 
-```shell
-cd frontend
-pnpm build
+```bash
+cp .env.example .env
+cd frontend && cp ../.env.example .env
 ```
 
-### Contracts (`pnpm` / `npm` from repo root)
+Vite merges env from **parent** `MonadClaim/.env` and **`frontend/.env`**; **`frontend/.env` wins** on duplicate keys. All browser-visible vars must be prefixed with **`VITE_`**.
 
-RPC defaults to `eth-rpc-url` in `foundry.toml` (Monad testnet unless you change it). Override any script with Forge flags after `--`.
+**Minimum for the app:**
 
-```shell
-pnpm install   # optional: only needed once if you use the root package.json scripts
-pnpm run compile      # forge build + sync ABI JSON to frontend/
-pnpm run compile:clean # clean build + sync ABI
-pnpm run sync:abi     # forge build then copy ABI (after contract edits)
-pnpm run test         # forge test
-pnpm run test:vv      # forge test -vv
-pnpm run deploy:dry   # simulate deploy (no on-chain tx)
-pnpm run deploy:env   # broadcast using PRIVATE_KEY from repo-root `.env` (recommended)
-pnpm run deploy -- --private-key 0x… # or pass a keystore name: -- --account monad-deployer (no extra `--` before these flags)
-pnpm run deploy:anvil # local anvil on :8545
+```env
+VITE_PARA_API_KEY=...
+VITE_UNIVERSAL_CLAIM_LINKS_ADDRESS=0x...   # after you deploy
+VITE_CHAIN_ID=10143                         # or 143 for mainnet
 ```
 
-Same with npm: `npm run compile`, etc.
+See **`.env.example`** for RPC, USDC address, Uniswap overrides, `VITE_CLAIMS_FROM_BLOCK`, and optional extra payout tokens.
 
-Deploy Solidity entrypoint: `script/DeployUniversalClaimLinks.s.sol` (`DeployUniversalClaimLinks`).
+**Deploy key (root `.env` only, never commit):**
 
-### “Is the contract running?”
-
-- **Locally**, it always “runs” if `pnpm run test` passes (same EVM as Monad).
-- **On-chain**, you must **deploy** and put that address in **`VITE_UNIVERSAL_CLAIM_LINKS_ADDRESS`** (see `.env.example`). The app does not deploy for you.
-
-Quick check (compile + test + optional bytecode at your env address):
-
-```shell
-pnpm run doctor
+```env
+PRIVATE_KEY=0x...
 ```
 
-If step 3 says **no bytecode**, the address is wrong, the RPC/network doesn’t match **`VITE_CHAIN_ID`**, or you haven’t deployed yet. Read-only sanity:
+Restart **`pnpm dev`** whenever you change `VITE_*`.
 
-```shell
-cast code YOUR_DEPLOYED_ADDRESS --rpc-url https://testnet-rpc.monad.xyz
-# should NOT be empty or only "0x"
+### 3) Compile contracts + sync ABI
+
+From **repo root**:
+
+```bash
+pnpm run compile
 ```
 
-### Build (contracts) — raw Forge
+This runs `forge build` and copies the ABI into the frontend.
 
-```shell
-forge build
+### 4) Test
+
+```bash
+pnpm run test
 ```
 
-### Test
+### 5) Deploy to Monad
 
-```shell
-forge test
-```
+Recommended (uses `PRIVATE_KEY` in `.env`):
 
-### Format
-
-```shell
-forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-forge snapshot
-```
-
-### Anvil
-
-```shell
-anvil
-```
-
-### Deploy to Monad Testnet
-
-First, you need to create a keystore file. Do not forget to remember the password! You will need it to deploy your contract.
-
-```shell
-cast wallet import monad-deployer --private-key $(cast wallet new | grep 'Private key:' | awk '{print $3}')
-```
-
-After creating the keystore, you can read its address using:
-
-```shell
-cast wallet address --account monad-deployer
-```
-
-The command above will create a keystore file named `monad-deployer` in the `~/.foundry/keystores` directory.
-
-Deploy `UniversalClaimLinks` (no constructor args), **recommended** (script logs the address):
-
-**Private key in `.env`:** add `PRIVATE_KEY=0x…` to `MonadClaim/.env`, then:
-
-```shell
+```bash
 pnpm run deploy:env
 ```
 
-**Keystore:** do not type `--` before `--account` (that forwards args into Solidity `run()` and triggers `encode length mismatch`). Append Forge flags after the npm divider:
+**Important:** when passing Forge flags through npm, do **not** add an extra `--` immediately before `--private-key` or `--account`; that can break script argument encoding.
 
-```shell
-pnpm run deploy -- --account monad-deployer
+Copy the deployed address into **`VITE_UNIVERSAL_CLAIM_LINKS_ADDRESS`**. Sanity check:
+
+```bash
+pnpm run doctor
 ```
 
-**Raw hex key (no keystore):**
+### 6) Run the web app
 
-```shell
-pnpm run deploy -- --private-key 0xYOUR_64_CHAR_HEX
+```bash
+cd frontend
+pnpm dev
 ```
 
-One-liner alternative:
+Production build (needs extra Node heap for this bundle):
 
-```shell
-forge create src/UniversalClaimLinks.sol:UniversalClaimLinks --account monad-deployer --broadcast
+```bash
+pnpm run build
 ```
 
-Put the deployed address in `frontend/.env` as `VITE_UNIVERSAL_CLAIM_LINKS_ADDRESS` (or repo-root `.env` merged by Vite).
+---
 
-### Verify Contract
+## Scripts reference
 
-```shell
-forge verify-contract \
-  <contract_address> \
-  src/UniversalClaimLinks.sol:UniversalClaimLinks \
-  --chain 10143 \
-  --verifier sourcify \
-  --verifier-url https://sourcify-api-monad.blockvision.org
-```
+### Root (`MonadClaim/package.json`)
 
-### Cast
-[Cast reference](https://book.getfoundry.sh/cast/)
-```shell
-cast <subcommand>
-```
+| Script | Purpose |
+|--------|---------|
+| `pnpm run compile` | `forge build` + sync ABI to frontend |
+| `pnpm run compile:clean` | `forge clean`, build, sync ABI |
+| `pnpm run sync:abi` | Build + sync ABI |
+| `pnpm run test` / `test:vv` | Forge tests |
+| `pnpm run deploy` | Broadcast deploy script (pass wallet flags after `--`) |
+| `pnpm run deploy:env` | Deploy using `PRIVATE_KEY` from `.env` |
+| `pnpm run deploy:dry` | Simulate deploy |
+| `pnpm run deploy:anvil` | Deploy to local Anvil |
+| `pnpm run doctor` | Bytecode / env sanity helper |
 
-### Help
+### Frontend (`frontend/package.json`)
 
-```shell
-forge --help
-anvil --help
-cast --help
-```
+| Script | Purpose |
+|--------|---------|
+| `pnpm dev` | Dev server |
+| `pnpm build` | Production build |
+| `pnpm preview` | Preview build |
+| `pnpm lint` | ESLint |
+| `pnpm test` | Vitest |
 
+---
 
-## FAQ
+## Where “history” lives
 
-### Error: `Error: server returned an error response: error code -32603: Signer had insufficient balance`
+The **Receipts / listings** UI does **not** read a hosted database. It:
 
-This error happens when you don't have enough balance to deploy your contract. You can check your balance with the following command:
+1. Queries **`ClaimCreated`** / **`ClaimExecuted`** / **`ClaimCancelled`** logs for your `VITE_UNIVERSAL_CLAIM_LINKS_ADDRESS`, and  
+2. Calls **`getClaim`** for each relevant `claimId`.
 
-```shell
-cast wallet address --account monad-deployer
-```
+Set **`VITE_CLAIMS_FROM_BLOCK`** to your contract deployment block (or earlier) if scanning from block `0` is too heavy for your RPC.
 
-### I have constructor arguments, how do I deploy my contract?
+---
 
-`UniversalClaimLinks` has no constructor arguments. For other contracts, use `--constructor-args` as needed.
+## Claim flow
 
-### I have constructor arguments, how do I verify my contract?
+### Create
 
-```shell
-forge verify-contract \
-  <contract_address> \
-  src/UniversalClaimLinks.sol:UniversalClaimLinks \
-  --chain 10143 \
-  --verifier sourcify \
-  --verifier-url https://sourcify-api-monad.blockvision.org
-```
+1. Connect with Para.  
+2. Choose **MON** or **USDC**, amount, expiry.  
+3. Choose **receiver address** or **open (secret)** flow.  
+4. Submit the **create** transaction.  
+5. Share the in-app link (`/claim/<id>`; for open claims, append `#<secret>`).
 
-Please refer to the [Foundry Book](https://book.getfoundry.sh/) for more information.
+### Claim
+
+1. Open the link or search by id.  
+2. Ensure the connected wallet matches the claim (or supply the secret for open claims).  
+3. Choose **Receive as** — **same asset** (direct) or **swap** when Uniswap is available on your chain.  
+4. Execute; use **View on explorer** when the UI shows a settlement tx.
+
+---
+
+## Uniswap & testnet caveats
+
+Published [Uniswap Monad deployment](https://docs.uniswap.org/contracts/v3/reference/deployments/monad-deployments) addresses are reliable on **mainnet (`143`)** for many setups. On **testnet (`10143`)**, the same addresses may have **no bytecode** after a reset—**swap quotes fail** until Monad publishes new testnet addresses (then set `VITE_UNISWAP_V3_*_10143` in `.env`). **Direct native MON claims** do not require Uniswap.
+
+---
+
+## Troubleshooting
+
+| Symptom | Things to check |
+|---------|------------------|
+| Para / wallet flaky | `VITE_PARA_API_KEY`, optional `VITE_PARA_ENV`, restart dev server after env edits |
+| Wrong network | `VITE_CHAIN_ID`, RPC URL, and wallet network must match deployment |
+| Claim reverts | Receiver or secret, not expired/open, correct `tokenOut` for direct claim |
+| Swap quote errors | Uniswap deployment on that chain; try same-asset claim or mainnet |
+| RPC `413` / timeouts | Narrow history with `VITE_CLAIMS_FROM_BLOCK`; retry or use a dedicated RPC |
+| ABI out of date | `pnpm run compile` after Solidity changes |
+
+---
+
+## Security notes
+
+- Never commit **private keys** or **service-role** secrets.  
+- Anything prefixed **`VITE_`** is exposed in the browser bundle—treat it as public.  
+- Prefer **anon / publishable** keys only for any future backend; this repo’s claim list does not require them today.
+
+---
+
+## License
+
+SPDX **`MIT`** on `UniversalClaimLinks.sol`. If you add a root `LICENSE` file for the whole repo, keep it consistent with dependencies under `lib/`.
+
+---
+
+## Links
+
+- [Monad documentation](https://docs.monad.xyz)  
+- [Foundry Book](https://book.getfoundry.sh/)  
+- [Para documentation](https://docs.getpara.com/)  
+- [Uniswap v3 – Monad deployments](https://docs.uniswap.org/contracts/v3/reference/deployments/monad-deployments)  
